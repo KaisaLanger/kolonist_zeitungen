@@ -1,0 +1,41 @@
+library(tidyverse,lib.loc="/gpfs/space/projects/digar_txt/R/4.1/")
+library(tidytext,lib.loc="/gpfs/space/projects/digar_txt/R/4.1/")
+library(digar.txts,lib.loc="/gpfs/space/projects/digar_txt/R/4.1/")
+all_issues <- get_digar_overview()
+subset <- all_issues %>%
+    filter(DocumentType=="NEWSPAPER") %>%
+    filter(year>1918&year<1940)
+subset_meta <- get_subset_meta(subset)
+nrow(subset_meta)
+subset_articlecounts <- subset_meta %>% 
+  count(year)
+
+subset_wordcounts <- subset_meta %>% 
+  group_by(year) %>% 
+  summarise(words=sum(LogicalSectionTextWordCount))
+
+searchterm<- "kolonist."
+searchfile<- "kolonist.txt"
+do_subset_search(searchterm=searchterm, searchfile=searchfile,subset)
+texts <- fread("kolonist.txt",header=F)[,.(id=V1,txt=V2)]
+texts_w_meta <- texts %>% left_join(subset_meta %>% select(LogicalSectionID,LogicalSectionTitle,LogicalSectionType,LogicalSectionTextWordCount,MeanOCRAccuracyVol,docid,year),by=c("id"="LogicalSectionID"))
+concs <- get_concordances(searchterm=searchterm,texts=texts3,before=30,after=30,txt="txt",id="id")
+
+nrow(texts)
+
+stopwords <- read_csv("https://datadoi.ee/bitstream/handle/33/78/estonian-stopwords.txt?sequence=1&isAllowed=y",col_names = F) %>% rename(word=X1)
+
+concs %>% 
+  filter(str_detect(context,"kolonist."))
+
+wordsnostops <- concs %>% 
+  unnest_tokens(word,context) %>% 
+  filter(!str_detect(word,"kolonist")) %>% 
+  filter(!str_detect(word,"[0-9]")) %>% 
+  mutate(word=str_replace(word,"w","v")) %>% 
+  anti_join(stopwords,by="word") %>% 
+  count(word,sort=T) %>% 
+  head(1000) %>% 
+  mutate(set="kolonist")
+
+write.csv(wordsnostops, file="wordsnostops.csv")
